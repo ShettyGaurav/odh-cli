@@ -9,6 +9,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 
 	lintpkg "github.com/opendatahub-io/odh-cli/pkg/lint"
+	clierrors "github.com/opendatahub-io/odh-cli/pkg/util/errors"
 )
 
 const (
@@ -85,20 +86,34 @@ func AddCommand(root *cobra.Command, flags *genericclioptions.ConfigFlags) {
 		SilenceUsage:  true,
 		SilenceErrors: true, // We'll handle error output manually based on --quiet flag
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			outputFormat := string(command.OutputFormat)
+
 			// Complete phase
 			if err := command.Complete(); err != nil {
+				if clierrors.WriteStructuredError(cmd.ErrOrStderr(), err, outputFormat) {
+					return clierrors.NewAlreadyHandledError(err)
+				}
+
 				if command.Verbose {
 					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
 				}
+
+				clierrors.WriteTextError(cmd.ErrOrStderr(), err)
 
 				return fmt.Errorf("completing command: %w", err)
 			}
 
 			// Validate phase
 			if err := command.Validate(); err != nil {
+				if clierrors.WriteStructuredError(cmd.ErrOrStderr(), err, outputFormat) {
+					return clierrors.NewAlreadyHandledError(err)
+				}
+
 				if command.Verbose {
 					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
 				}
+
+				clierrors.WriteTextError(cmd.ErrOrStderr(), err)
 
 				return fmt.Errorf("validating command: %w", err)
 			}
@@ -106,9 +121,15 @@ func AddCommand(root *cobra.Command, flags *genericclioptions.ConfigFlags) {
 			// Run phase
 			err := command.Run(cmd.Context())
 			if err != nil {
+				if clierrors.WriteStructuredError(cmd.ErrOrStderr(), err, outputFormat) {
+					return clierrors.NewAlreadyHandledError(err)
+				}
+
 				if command.Verbose {
 					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
 				}
+
+				clierrors.WriteTextError(cmd.ErrOrStderr(), err)
 
 				return fmt.Errorf("running command: %w", err)
 			}
