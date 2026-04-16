@@ -29,6 +29,10 @@ func convertValue(value any) (any, error) {
 
 	// Handle *unstructured.Unstructured by pointer
 	if v, ok := value.(*unstructured.Unstructured); ok {
+		if v == nil {
+			return nil, nil
+		}
+
 		return v.Object, nil
 	}
 
