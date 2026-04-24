@@ -30,6 +30,13 @@ CONTAINER_TAGS ?= $(VERSION)
 GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
 
+# FIPS-related build vars for build recipe
+# To build for fips:
+# make build CGO_ENABLED=1 GOEXPERIMENT=strictfipsruntime GO_BUILD_TAGS="-tags strictfipsruntime"
+CGO_ENABLED ?= 0
+GOEXPERIMENT ?=
+GO_BUILD_TAGS ?=
+
 ## Tools
 GOLANGCI_VERSION ?= v2.8.0
 GOLANGCI ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)
@@ -54,8 +61,8 @@ fetch-deps:
 # Build the binary
 .PHONY: build
 build: fetch-deps
-	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) \
-		go build -ldflags "$(LDFLAGS)" -o $(BINARY_NAME) cmd/main.go
+	CGO_ENABLED=$(CGO_ENABLED) GOEXPERIMENT=$(GOEXPERIMENT) GOOS=$(GOOS) GOARCH=$(GOARCH) \
+		go build $(GO_BUILD_TAGS) -ldflags "$(LDFLAGS)" -o $(BINARY_NAME) cmd/main.go
 
 # Run the doctor command
 .PHONY: run
