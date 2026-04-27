@@ -175,13 +175,13 @@ func OutputTable(w io.Writer, components []ComponentInfo) error {
 
 // OutputJSON renders components as JSON.
 func OutputJSON(w io.Writer, components []ComponentInfo) error {
-	output := ComponentList{Components: components}
+	list := NewComponentList(components)
 
-	renderer := printerjson.NewRenderer[ComponentList](
-		printerjson.WithWriter[ComponentList](w),
+	renderer := printerjson.NewRenderer[*ComponentList](
+		printerjson.WithWriter[*ComponentList](w),
 	)
 
-	if err := renderer.Render(output); err != nil {
+	if err := renderer.Render(list); err != nil {
 		return fmt.Errorf("rendering JSON: %w", err)
 	}
 
@@ -190,13 +190,13 @@ func OutputJSON(w io.Writer, components []ComponentInfo) error {
 
 // OutputYAML renders components as YAML.
 func OutputYAML(w io.Writer, components []ComponentInfo) error {
-	output := ComponentList{Components: components}
+	list := NewComponentList(components)
 
-	renderer := printeryaml.NewRenderer[ComponentList](
-		printeryaml.WithWriter[ComponentList](w),
+	renderer := printeryaml.NewRenderer[*ComponentList](
+		printeryaml.WithWriter[*ComponentList](w),
 	)
 
-	if err := renderer.Render(output); err != nil {
+	if err := renderer.Render(list); err != nil {
 		return fmt.Errorf("rendering YAML: %w", err)
 	}
 

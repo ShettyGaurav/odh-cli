@@ -203,9 +203,9 @@ func (c *Command) printDryRun(manifest *Manifest) error {
 
 	switch c.Output {
 	case outputJSON:
-		return c.printJSON(deps)
+		return c.printJSON(NewDependencyManifestList(deps))
 	case outputYAML:
-		return c.printYAML(deps)
+		return c.printYAML(NewDependencyManifestList(deps))
 	default:
 		return c.printDryRunTable(deps)
 	}
@@ -214,9 +214,9 @@ func (c *Command) printDryRun(manifest *Manifest) error {
 func (c *Command) printResults(statuses []DependencyStatus) error {
 	switch c.Output {
 	case outputJSON:
-		return c.printJSON(statuses)
+		return c.printJSON(NewDependencyList(statuses))
 	case outputYAML:
-		return c.printYAML(statuses)
+		return c.printYAML(NewDependencyList(statuses))
 	default:
 		return c.printTable(statuses)
 	}

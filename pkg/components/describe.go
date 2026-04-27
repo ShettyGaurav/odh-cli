@@ -175,11 +175,12 @@ func truncateString(s string, maxLen int) string {
 }
 
 func (c *DescribeCommand) outputJSON(details *ComponentDetails) error {
-	renderer := printerjson.NewRenderer[*ComponentDetails](
-		printerjson.WithWriter[*ComponentDetails](c.IO.Out()),
+	result := NewComponentDetailsResult(*details)
+	renderer := printerjson.NewRenderer[*ComponentDetailsResult](
+		printerjson.WithWriter[*ComponentDetailsResult](c.IO.Out()),
 	)
 
-	if err := renderer.Render(details); err != nil {
+	if err := renderer.Render(result); err != nil {
 		return fmt.Errorf("rendering JSON: %w", err)
 	}
 
@@ -187,11 +188,12 @@ func (c *DescribeCommand) outputJSON(details *ComponentDetails) error {
 }
 
 func (c *DescribeCommand) outputYAML(details *ComponentDetails) error {
-	renderer := printeryaml.NewRenderer[*ComponentDetails](
-		printeryaml.WithWriter[*ComponentDetails](c.IO.Out()),
+	result := NewComponentDetailsResult(*details)
+	renderer := printeryaml.NewRenderer[*ComponentDetailsResult](
+		printeryaml.WithWriter[*ComponentDetailsResult](c.IO.Out()),
 	)
 
-	if err := renderer.Render(details); err != nil {
+	if err := renderer.Render(result); err != nil {
 		return fmt.Errorf("rendering YAML: %w", err)
 	}
 
