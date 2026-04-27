@@ -11,6 +11,9 @@ import (
 
 const (
 	msgParseManifest = "parse manifest: %w"
+
+	enabledTrue = "true"
+	enabledAuto = "auto"
 )
 
 //nolint:gochecknoglobals // static lookup table for display names
@@ -57,14 +60,21 @@ type Dependency struct {
 	Enabled      string         `yaml:"enabled"` // "auto", "true", "false"
 	OLM          OLMConfig      `yaml:"olm"`
 	Dependencies map[string]any `yaml:"dependencies"` // Transitive dependencies
+	Config       *ConfigSpec    `yaml:"config"`       // Post-install CR configuration
 }
 
 // OLMConfig contains OLM subscription details.
 type OLMConfig struct {
-	Channel   string `yaml:"channel"`
-	Name      string `yaml:"name"`      // Subscription name
-	Namespace string `yaml:"namespace"` // Operator namespace
-	Source    string `yaml:"source"`    // Catalog source (optional, defaults to redhat-operators)
+	Channel          string   `yaml:"channel"`
+	Name             string   `yaml:"name"`             // Subscription name
+	Namespace        string   `yaml:"namespace"`        // Operator namespace
+	Source           string   `yaml:"source"`           // Catalog source (optional, defaults to redhat-operators)
+	TargetNamespaces []string `yaml:"targetNamespaces"` // OperatorGroup target namespaces
+}
+
+// ConfigSpec contains post-install CR configuration.
+type ConfigSpec struct {
+	Spec map[string]any `yaml:"spec"` // CR spec fields
 }
 
 // Component represents an ODH/RHOAI component configuration.
@@ -72,15 +82,18 @@ type Component struct {
 	Dependencies map[string]any `yaml:"dependencies"`
 }
 
-// DependencyInfo is a flattened view of a dependency for display.
+// DependencyInfo is a flattened view of a dependency for display and installation.
 type DependencyInfo struct {
-	Name         string   `json:"name"                 yaml:"name"`
-	DisplayName  string   `json:"displayName"          yaml:"displayName"`
-	Enabled      string   `json:"enabled"              yaml:"enabled"`
-	Subscription string   `json:"subscription"         yaml:"subscription"`
-	Namespace    string   `json:"namespace"            yaml:"namespace"`
-	Channel      string   `json:"channel,omitempty"    yaml:"channel,omitempty"`
-	RequiredBy   []string `json:"requiredBy,omitempty" yaml:"requiredBy,omitempty"`
+	Name             string      `json:"name"                       yaml:"name"`
+	DisplayName      string      `json:"displayName"                yaml:"displayName"`
+	Enabled          string      `json:"enabled"                    yaml:"enabled"`
+	Subscription     string      `json:"subscription"               yaml:"subscription"`
+	Namespace        string      `json:"namespace"                  yaml:"namespace"`
+	Channel          string      `json:"channel,omitempty"          yaml:"channel,omitempty"`
+	Source           string      `json:"source,omitempty"           yaml:"source,omitempty"`
+	TargetNamespaces []string    `json:"targetNamespaces,omitempty" yaml:"targetNamespaces,omitempty"`
+	RequiredBy       []string    `json:"requiredBy,omitempty"       yaml:"requiredBy,omitempty"`
+	Config           *ConfigSpec `json:"config,omitempty"           yaml:"config,omitempty"`
 }
 
 // Parse parses values.yaml content into a Manifest.
@@ -100,13 +113,16 @@ func (m *Manifest) GetDependencies() []DependencyInfo {
 	deps := make([]DependencyInfo, 0, len(m.Dependencies))
 	for name, dep := range m.Dependencies {
 		info := DependencyInfo{
-			Name:         name,
-			DisplayName:  toDisplayName(name),
-			Enabled:      dep.Enabled,
-			Subscription: dep.OLM.Name,
-			Namespace:    dep.OLM.Namespace,
-			Channel:      dep.OLM.Channel,
-			RequiredBy:   requiredBy[name],
+			Name:             name,
+			DisplayName:      toDisplayName(name),
+			Enabled:          dep.Enabled,
+			Subscription:     dep.OLM.Name,
+			Namespace:        dep.OLM.Namespace,
+			Channel:          dep.OLM.Channel,
+			Source:           dep.OLM.Source,
+			TargetNamespaces: dep.OLM.TargetNamespaces,
+			RequiredBy:       requiredBy[name],
+			Config:           dep.Config,
 		}
 		deps = append(deps, info)
 	}
@@ -165,7 +181,7 @@ func isEnabled(val any) bool {
 	case bool:
 		return v
 	case string:
-		return v == "true" || v == "auto"
+		return v == enabledTrue || v == enabledAuto
 	default:
 		return false
 	}
