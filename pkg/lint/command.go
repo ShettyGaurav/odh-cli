@@ -2,6 +2,7 @@ package lint
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
