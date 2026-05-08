@@ -512,6 +512,109 @@ func TestGetApplicationsNamespace_EmptyNamespace(t *testing.T) {
 	g.Expect(namespace).To(BeEmpty())
 }
 
+// createDSCInitializationWithMonitoring creates a DSCI with both applications and monitoring namespaces.
+func createDSCInitializationWithMonitoring(applicationsNS, monitoringNS string) runtime.Object {
+	spec := map[string]any{}
+
+	if applicationsNS != "" {
+		spec["applicationsNamespace"] = applicationsNS
+	}
+
+	if monitoringNS != "" {
+		spec["monitoring"] = map[string]any{
+			"namespace": monitoringNS,
+		}
+	}
+
+	return &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": resources.DSCInitialization.APIVersion(),
+			"kind":       resources.DSCInitialization.Kind,
+			"metadata": map[string]any{
+				"name": "default-dsci",
+			},
+			"spec": spec,
+		},
+	}
+}
+
+func TestGetMonitoringNamespace_MonitoringSet(t *testing.T) {
+	g := NewWithT(t)
+	ctx := t.Context()
+
+	const expectedMonitoringNS = "my-monitoring-namespace"
+	const applicationsNS = "my-odh-namespace"
+
+	dsci := createDSCInitializationWithMonitoring(applicationsNS, expectedMonitoringNS)
+	scheme := runtime.NewScheme()
+	_ = metav1.AddMetaToScheme(scheme)
+
+	dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme, dsci)
+	metadataClient := metadatafake.NewSimpleMetadataClient(scheme, dsci)
+
+	client := &defaultClient{
+		dynamic:   dynamicClient,
+		metadata:  metadataClient,
+		olmReader: newOLMReader(nil),
+	}
+
+	namespace, err := GetMonitoringNamespace(ctx, client)
+
+	g.Expect(err).ToNot(HaveOccurred())
+	g.Expect(namespace).To(Equal(expectedMonitoringNS))
+}
+
+func TestGetMonitoringNamespace_FallsBackToApplicationsNamespace(t *testing.T) {
+	g := NewWithT(t)
+	ctx := t.Context()
+
+	const applicationsNS = "my-odh-namespace"
+
+	dsci := createDSCInitializationWithMonitoring(applicationsNS, "")
+	scheme := runtime.NewScheme()
+	_ = metav1.AddMetaToScheme(scheme)
+
+	dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme, dsci)
+	metadataClient := metadatafake.NewSimpleMetadataClient(scheme, dsci)
+
+	client := &defaultClient{
+		dynamic:   dynamicClient,
+		metadata:  metadataClient,
+		olmReader: newOLMReader(nil),
+	}
+
+	namespace, err := GetMonitoringNamespace(ctx, client)
+
+	g.Expect(err).ToNot(HaveOccurred())
+	g.Expect(namespace).To(Equal(applicationsNS))
+}
+
+func TestGetMonitoringNamespace_DSCINotFound(t *testing.T) {
+	g := NewWithT(t)
+	ctx := t.Context()
+
+	scheme := runtime.NewScheme()
+	_ = metav1.AddMetaToScheme(scheme)
+
+	gvrListMap := map[schema.GroupVersionResource]string{
+		resources.DSCInitialization.GVR(): "DSCInitializationList",
+	}
+
+	dynamicClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, gvrListMap)
+	metadataClient := metadatafake.NewSimpleMetadataClient(scheme)
+
+	client := &defaultClient{
+		dynamic:   dynamicClient,
+		metadata:  metadataClient,
+		olmReader: newOLMReader(nil),
+	}
+
+	namespace, err := GetMonitoringNamespace(ctx, client)
+
+	g.Expect(err).To(Satisfy(apierrors.IsNotFound))
+	g.Expect(namespace).To(BeEmpty())
+}
+
 // --- List[T] tests ---
 
 func configMapResourceType() resources.ResourceType {

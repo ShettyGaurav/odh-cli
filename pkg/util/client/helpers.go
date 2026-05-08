@@ -387,6 +387,33 @@ func GetApplicationsNamespace(ctx context.Context, r Reader) (string, error) {
 	return namespace, nil
 }
 
+// GetMonitoringNamespace retrieves the monitoring namespace from DSCInitialization.
+// Returns the namespace string if found in spec.monitoring.namespace.
+// If not set or empty, falls back to the applications namespace.
+// Returns empty string and error only for non-recoverable failures.
+func GetMonitoringNamespace(ctx context.Context, r Reader) (string, error) {
+	dsci, err := GetDSCInitialization(ctx, r)
+	if err != nil {
+		return "", err
+	}
+
+	monNS, err := jq.Query[string](dsci, ".spec.monitoring.namespace")
+	if err != nil && !errors.Is(err, jq.ErrNotFound) {
+		return "", fmt.Errorf("querying monitoring.namespace: %w", err)
+	}
+
+	if monNS != "" {
+		return monNS, nil
+	}
+
+	appNS, err := jq.Query[string](dsci, ".spec.applicationsNamespace")
+	if err != nil && !errors.Is(err, jq.ErrNotFound) {
+		return "", fmt.Errorf("querying applicationsNamespace for monitoring fallback: %w", err)
+	}
+
+	return appNS, nil
+}
+
 // List lists resources of the given type, applies an optional filter, and returns matching items.
 // CRD-not-found errors are treated as an empty list. Pass nil filter to return all.
 // T must be *unstructured.Unstructured (dispatches to Reader.List) or *metav1.PartialObjectMetadata

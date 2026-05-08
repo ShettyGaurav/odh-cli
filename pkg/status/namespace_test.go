@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/opendatahub-io/odh-cli/pkg/resources"
+	"github.com/opendatahub-io/odh-cli/pkg/util/client"
 	mockclient "github.com/opendatahub-io/odh-cli/pkg/util/test/mocks/client"
 
 	. "github.com/onsi/gomega"
@@ -133,7 +134,7 @@ func TestDiscoverOperatorName(t *testing.T) {
 	t.Run("override takes priority", func(t *testing.T) {
 		g := NewWithT(t)
 
-		name := discoverOperatorName(&operatorInfo{DeploymentName: "from-olm"}, "my-override")
+		name := discoverOperatorName(&client.OperatorInfo{DeploymentName: "from-olm"}, "my-override")
 
 		g.Expect(name).To(Equal("my-override"))
 	})
@@ -141,7 +142,7 @@ func TestDiscoverOperatorName(t *testing.T) {
 	t.Run("uses operator info deployment name", func(t *testing.T) {
 		g := NewWithT(t)
 
-		name := discoverOperatorName(&operatorInfo{DeploymentName: "opendatahub-operator-controller-manager"}, "")
+		name := discoverOperatorName(&client.OperatorInfo{DeploymentName: "opendatahub-operator-controller-manager"}, "")
 
 		g.Expect(name).To(Equal("opendatahub-operator-controller-manager"))
 	})
@@ -157,7 +158,7 @@ func TestDiscoverOperatorName(t *testing.T) {
 	t.Run("returns default when deployment name is empty", func(t *testing.T) {
 		g := NewWithT(t)
 
-		name := discoverOperatorName(&operatorInfo{}, "")
+		name := discoverOperatorName(&client.OperatorInfo{}, "")
 
 		g.Expect(name).To(Equal(defaultRHOAIOperatorName))
 	})
@@ -180,7 +181,7 @@ func TestDiscoverOperatorNamespace(t *testing.T) {
 
 		mockReader := &mockclient.MockReader{}
 
-		ns, err := discoverOperatorNamespace(t.Context(), mockReader, &operatorInfo{Namespace: "openshift-operators"}, "")
+		ns, err := discoverOperatorNamespace(t.Context(), mockReader, &client.OperatorInfo{Namespace: "openshift-operators"}, "")
 
 		g.Expect(err).ToNot(HaveOccurred())
 		g.Expect(ns).To(Equal("openshift-operators"))
@@ -196,12 +197,12 @@ func TestDiscoverOperatorNamespace(t *testing.T) {
 		ns, err := discoverOperatorNamespace(t.Context(), mockReader, nil, "")
 
 		g.Expect(err).ToNot(HaveOccurred())
-		g.Expect(ns).To(Equal(defaultRHOAIOperatorNamespace))
+		g.Expect(ns).To(Equal(client.DefaultRHOAIOperatorNamespace))
 		mockReader.AssertExpectations(t)
 	})
 }
 
-func TestDiscoverOperatorNamespaceFromDefaults(t *testing.T) {
+func TestDiscoverOperatorNamespaceWithInfoFallback(t *testing.T) {
 	t.Run("finds rhods-operator in redhat-ods-operator namespace", func(t *testing.T) {
 		g := NewWithT(t)
 
@@ -209,10 +210,10 @@ func TestDiscoverOperatorNamespaceFromDefaults(t *testing.T) {
 		mockReader.On("GetResource", mock.Anything, resources.Deployment, "rhods-operator", mock.Anything).
 			Return(&unstructured.Unstructured{}, nil).Once()
 
-		ns, err := discoverOperatorNamespaceFromDefaults(t.Context(), mockReader)
+		ns, err := client.DiscoverOperatorNamespaceWithInfo(t.Context(), mockReader, nil)
 
 		g.Expect(err).ToNot(HaveOccurred())
-		g.Expect(ns).To(Equal(defaultRHOAIOperatorNamespace))
+		g.Expect(ns).To(Equal(client.DefaultRHOAIOperatorNamespace))
 		mockReader.AssertExpectations(t)
 	})
 
@@ -227,10 +228,10 @@ func TestDiscoverOperatorNamespaceFromDefaults(t *testing.T) {
 		mockReader.On("GetResource", mock.Anything, resources.Deployment, "opendatahub-operator-controller-manager", mock.Anything).
 			Return(&unstructured.Unstructured{}, nil).Once()
 
-		ns, err := discoverOperatorNamespaceFromDefaults(t.Context(), mockReader)
+		ns, err := client.DiscoverOperatorNamespaceWithInfo(t.Context(), mockReader, nil)
 
 		g.Expect(err).ToNot(HaveOccurred())
-		g.Expect(ns).To(Equal(defaultODHOperatorNamespace))
+		g.Expect(ns).To(Equal(client.DefaultODHOperatorNamespace))
 		mockReader.AssertExpectations(t)
 	})
 
@@ -245,10 +246,10 @@ func TestDiscoverOperatorNamespaceFromDefaults(t *testing.T) {
 		mockReader.On("GetResource", mock.Anything, resources.Deployment, "opendatahub-operator-controller-manager", mock.Anything).
 			Return(&unstructured.Unstructured{}, nil).Once()
 
-		ns, err := discoverOperatorNamespaceFromDefaults(t.Context(), mockReader)
+		ns, err := client.DiscoverOperatorNamespaceWithInfo(t.Context(), mockReader, nil)
 
 		g.Expect(err).ToNot(HaveOccurred())
-		g.Expect(ns).To(Equal(defaultOpenShiftOperatorsNS))
+		g.Expect(ns).To(Equal(client.DefaultOpenShiftOperatorsNS))
 		mockReader.AssertExpectations(t)
 	})
 
@@ -259,7 +260,7 @@ func TestDiscoverOperatorNamespaceFromDefaults(t *testing.T) {
 		mockReader.On("GetResource", mock.Anything, resources.Deployment, mock.Anything, mock.Anything).
 			Return(nil, errors.New("not found"))
 
-		ns, err := discoverOperatorNamespaceFromDefaults(t.Context(), mockReader)
+		ns, err := client.DiscoverOperatorNamespaceWithInfo(t.Context(), mockReader, nil)
 
 		g.Expect(err).To(HaveOccurred())
 		g.Expect(ns).To(BeEmpty())
@@ -277,7 +278,7 @@ func TestDiscoverOperatorFromOLM(t *testing.T) {
 		mockReader := &mockclient.MockReader{}
 		mockReader.On("OLM").Return(mockOLM)
 
-		info := discoverOperatorFromOLM(t.Context(), mockReader)
+		info := client.DiscoverOperatorFromOLM(t.Context(), mockReader)
 
 		g.Expect(info).To(BeNil())
 		mockOLM.AssertExpectations(t)
@@ -297,7 +298,7 @@ func TestDiscoverOperatorFromOLM(t *testing.T) {
 		mockReader := &mockclient.MockReader{}
 		mockReader.On("OLM").Return(mockOLM)
 
-		info := discoverOperatorFromOLM(t.Context(), mockReader)
+		info := client.DiscoverOperatorFromOLM(t.Context(), mockReader)
 
 		g.Expect(info).To(BeNil())
 		mockReader.AssertExpectations(t)
@@ -328,7 +329,7 @@ func TestDiscoverOperatorFromOLM(t *testing.T) {
 		mockReader := &mockclient.MockReader{}
 		mockReader.On("OLM").Return(mockOLM)
 
-		info := discoverOperatorFromOLM(t.Context(), mockReader)
+		info := client.DiscoverOperatorFromOLM(t.Context(), mockReader)
 
 		g.Expect(info).To(BeNil())
 		mockReader.AssertExpectations(t)
@@ -368,7 +369,7 @@ func TestDiscoverOperatorFromOLM(t *testing.T) {
 		mockReader := &mockclient.MockReader{}
 		mockReader.On("OLM").Return(mockOLM)
 
-		info := discoverOperatorFromOLM(t.Context(), mockReader)
+		info := client.DiscoverOperatorFromOLM(t.Context(), mockReader)
 
 		g.Expect(info).ToNot(BeNil())
 		g.Expect(info.Namespace).To(Equal("redhat-ods-operator"))
@@ -410,7 +411,7 @@ func TestDiscoverOperatorFromOLM(t *testing.T) {
 		mockReader := &mockclient.MockReader{}
 		mockReader.On("OLM").Return(mockOLM)
 
-		info := discoverOperatorFromOLM(t.Context(), mockReader)
+		info := client.DiscoverOperatorFromOLM(t.Context(), mockReader)
 
 		g.Expect(info).ToNot(BeNil())
 		g.Expect(info.Namespace).To(Equal("openshift-operators"))
@@ -455,7 +456,7 @@ func TestDiscoverOperatorFromOLM(t *testing.T) {
 		mockReader := &mockclient.MockReader{}
 		mockReader.On("OLM").Return(mockOLM)
 
-		info := discoverOperatorFromOLM(t.Context(), mockReader)
+		info := client.DiscoverOperatorFromOLM(t.Context(), mockReader)
 
 		g.Expect(info).ToNot(BeNil())
 		g.Expect(info.Namespace).To(Equal("redhat-ods-operator"))
@@ -495,7 +496,7 @@ func TestDiscoverOperatorFromOLM(t *testing.T) {
 		mockReader := &mockclient.MockReader{}
 		mockReader.On("OLM").Return(mockOLM)
 
-		info := discoverOperatorFromOLM(t.Context(), mockReader)
+		info := client.DiscoverOperatorFromOLM(t.Context(), mockReader)
 
 		g.Expect(info).ToNot(BeNil())
 		g.Expect(info.Namespace).To(Equal("redhat-ods-operator"))
