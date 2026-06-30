@@ -160,7 +160,7 @@ func (a *AttachKueueLabelAction) patchLabel(
 	nb *unstructured.Unstructured,
 ) error {
 	patch := map[string]any{
-		"metadata": map[string]any{ //nolint:goconst // standard K8s JSON patch key
+		"metadata": map[string]any{
 			"labels": map[string]any{
 				constants.LabelKueueQueueName: a.queueName(),
 			},
